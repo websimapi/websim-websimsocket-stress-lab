@@ -13,7 +13,7 @@ const ui = {
     els: {
         statusDot: document.getElementById('connection-status'),
         statusText: document.getElementById('connection-text'),
-        peerCount: document.getElementById('active-peers'),
+        headerPeerCount: document.getElementById('active-peers'),
         ping: document.getElementById('dash-ping'),
         jitter: document.getElementById('dash-jitter'),
         conv: document.getElementById('dash-conv'),
@@ -113,6 +113,9 @@ const ui = {
         const now = Date.now();
         if (now - this.lastConnUpdate < 500) return;
         this.lastConnUpdate = now;
+
+        // Update Header Count
+        this.els.headerPeerCount.textContent = Object.keys(peers).length;
 
         const myPresence = presence[myId] || {};
         const myRole = myPresence.role || 'peer';
@@ -280,7 +283,6 @@ async function main() {
 
     // --- Subscriptions ---
     room.subscribePresence((p) => {
-        ui.updatePeers(room.peers);
         ui.updateConnectionManager(room.peers, room.presence, room.clientId);
         testSuite.onPresenceUpdate();
     });
