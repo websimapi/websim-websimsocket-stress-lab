@@ -234,6 +234,10 @@ input:checked + .slider:before { transform: translateX(20px); }
     margin-bottom: 1.5rem;
 }
 
+.card.full-width {
+    grid-column: 1 / -1;
+}
+
 .card {
     background: var(--surface);
     padding: 1.5rem;

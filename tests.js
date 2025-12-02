@@ -6,6 +6,9 @@ export class TestSuite {
         this.role = 'peer';
         this.hostId = null;
         this.peerStats = {}; // Tracking incoming traffic as Host
+        
+        // Aggregate RX for Host Dashboard
+        this.aggregateRx = { bytes: 0, count: 0 };
 
         // Latency & Jitter
         this.latencyRunning = false;
@@ -37,11 +40,33 @@ export class TestSuite {
     updateTopology(role, hostId) {
         this.role = role;
         this.hostId = hostId;
+        // Reset aggregates on role change
+        this.aggregateRx = { bytes: 0, count: 0 };
+    }
+
+    broadcastLog(msg, type='system') {
+        const username = this.room.peers[this.room.clientId]?.username || 'Me';
+        this.ui.logLatency(`${msg}`, type); // Local log
+        
+        this.room.send({
+            type: 'sys-log',
+            message: msg,
+            logType: type,
+            senderName: username,
+            echo: false
+        });
     }
 
     handleMessage(e) {
         const data = e.data;
         const now = performance.now();
+
+        // 0. System Log Sync
+        if (data.type === 'sys-log') {
+            const senderName = data.senderName || 'Unknown';
+            this.ui.logLatency(`[${senderName}] ${data.message}`, data.logType || 'info');
+            return;
+        }
 
         // 1. Latency: P2P Ping (Host Side Logic)
         if (data.type === 'p2p-ping' && data.target === this.room.clientId) {
@@ -51,8 +76,8 @@ export class TestSuite {
                 pingTimestamp: data.timestamp,
                 echo: false
             });
-            // Visual feedback for host
-            this.ui.updateDashboardMetric('p2p-rtt', 'RCV');
+            // Visual feedback for host - aggregate to dashboard
+            this.aggregateRx.count++; 
         }
 
         // 2. Latency: P2P Pong (Peer Side Logic)
@@ -96,6 +121,10 @@ export class TestSuite {
     }
 
     trackPeerTraffic(senderId, bytes) {
+        // Global Host Aggregate
+        this.aggregateRx.bytes += bytes;
+        this.aggregateRx.count++;
+
         if (!this.peerStats[senderId]) {
             this.peerStats[senderId] = { bytes: 0, count: 0, lastReport: Date.now() };
         }
@@ -118,8 +147,8 @@ export class TestSuite {
                 echo: false
             });
             
-            // Update local host dashboard to show we are receiving
-            this.ui.updateDashboardMetric('rx', pps); // Show PPS from this peer
+            // NOTE: We rely on startBackgroundMonitor to update the dashboard 'rx' metrics
+            // to avoid overwriting values from other peers.
             
             // Reset
             stats.bytes = 0;
@@ -133,9 +162,28 @@ export class TestSuite {
         setInterval(() => {
             const now = Date.now();
             const elapsed = (now - this.lastRxCheck) / 1000;
-            if (elapsed > 0) {
-                const rxRate = Math.round(this.rxCount / elapsed);
-                this.ui.updateDashboardMetric('rx', rxRate);
+            
+            if (elapsed >= 1) {
+                // 1. Calculated Aggregate RX (From throughput/latency tests)
+                if (this.aggregateRx.count > 0) {
+                    const rxRate = Math.round(this.aggregateRx.count / elapsed);
+                    const rxKbps = ((this.aggregateRx.bytes / 1024) / elapsed).toFixed(1);
+                    
+                    this.ui.updateDashboardMetric('rx', rxRate); // PPS
+                    this.ui.updateDashboardMetric('host-rx', rxKbps); // KB/s
+                    
+                    // Reset
+                    this.aggregateRx = { bytes: 0, count: 0 };
+                } else if (this.rxCount > 0) {
+                     // Fallback to generic background noise if no test traffic
+                     const rxRate = Math.round(this.rxCount / elapsed);
+                     this.ui.updateDashboardMetric('rx', rxRate);
+                     this.ui.updateDashboardMetric('host-rx', 0);
+                } else {
+                     this.ui.updateDashboardMetric('rx', 0);
+                     this.ui.updateDashboardMetric('host-rx', 0);
+                }
+
                 this.rxCount = 0;
                 this.lastRxCheck = now;
             }
@@ -169,7 +217,7 @@ export class TestSuite {
     startLatencyTest() {
         if (this.latencyRunning) return;
         this.latencyRunning = true;
-        this.ui.logLatency("Starting latency test (5 pings/sec)...", "system");
+        this.broadcastLog("Starting Latency Test (5 pings/sec)", "system");
         
         // Reset jitter
         this.jitter = 0;
@@ -200,7 +248,7 @@ export class TestSuite {
     stopLatencyTest() {
         this.latencyRunning = false;
         clearInterval(this.latencyInterval);
-        this.ui.logLatency("Latency test stopped.", "system");
+        this.broadcastLog("Stopped Latency Test", "system");
         this.ui.updateDashboardMetric('p2p-rtt', '--');
     }
 
@@ -209,6 +257,8 @@ export class TestSuite {
         if (this.throughputRunning) return;
         this.throughputRunning = true;
         this.throughputStats = { sent: 0, bytes: 0, startTime: Date.now() };
+
+        this.broadcastLog(`Starting Throughput Load: ${sizeBytes}B @ ${intervalMs}ms`, "warning");
 
         // Create junk payload
         const filler = "X".repeat(Math.max(0, sizeBytes - 50)); // -50 for overhead
@@ -257,6 +307,9 @@ export class TestSuite {
         clearInterval(this.throughputInterval);
         // Clean up presence just in case we used it
         this.room.updatePresence({ test_mode: null, payload: null });
+        
+        this.broadcastLog("Stopped Throughput Test", "system");
+
         this.ui.updateThroughputStats(null);
         this.ui.updateDashboardMetric('pps', 0);
         this.ui.updateDashboardMetric('bw', 0);
@@ -271,7 +324,7 @@ export class TestSuite {
         this.convergenceKey = key;
         this.convergenceStart = performance.now();
         
-        this.ui.logLatency("Starting convergence test...", "system");
+        this.broadcastLog("Starting State Convergence Test...", "system");
         
         // Trigger update
         this.room.updateRoomState({
@@ -280,6 +333,7 @@ export class TestSuite {
     }
 
     async addStressObjects(count) {
+        this.broadcastLog(`Adding ${count} stress objects to Room State`, "warning");
         const batch = {};
         const prefix = `stress_${this.room.clientId}_${Date.now()}_`;
 
@@ -303,6 +357,7 @@ export class TestSuite {
     }
 
     clearStressObjects() {
+        this.broadcastLog("Clearing all stress objects", "danger");
         // To delete, we set keys to null, or set the parent key to null if we want to wipe it all
         // Ideally we wipe the specific keys we created, but for a stress test, let's nuke the collection
         this.room.updateRoomState({

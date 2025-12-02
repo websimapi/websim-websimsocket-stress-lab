@@ -27,6 +27,7 @@ const ui = {
         stressSize: document.getElementById('stress-size'),
         stressVis: document.getElementById('stress-visualizer'),
         log: document.getElementById('latency-log'),
+        dashLog: document.getElementById('dashboard-log'),
         
         // Connection Manager
         hostCount: document.getElementById('host-count'),
@@ -242,11 +243,24 @@ const ui = {
     },
 
     logLatency(msg, type='info') {
-        const div = document.createElement('div');
-        div.className = `log-entry ${type}`;
-        div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-        this.els.log.prepend(div);
-        if (this.els.log.children.length > 50) this.els.log.lastChild.remove();
+        const createEntry = () => {
+            const div = document.createElement('div');
+            div.className = `log-entry ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            return div;
+        };
+
+        // Update Latency Tab Log
+        if (this.els.log) {
+            this.els.log.prepend(createEntry());
+            if (this.els.log.children.length > 50) this.els.log.lastChild.remove();
+        }
+
+        // Update Dashboard Log
+        if (this.els.dashLog) {
+            this.els.dashLog.prepend(createEntry());
+            if (this.els.dashLog.children.length > 50) this.els.dashLog.lastChild.remove();
+        }
     },
 
     updateDashboardMetric(id, val) {
