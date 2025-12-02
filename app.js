@@ -19,6 +19,8 @@ const ui = {
         conv: document.getElementById('dash-conv'),
         pps: document.getElementById('dash-pps'),
         rx: document.getElementById('dash-rx'),
+        hostRx: document.getElementById('dash-host-rx'),
+        p2pRtt: document.getElementById('dash-p2p-rtt'),
         keys: document.getElementById('dash-keys'),
         bw: document.getElementById('dash-bw'),
         stressCount: document.getElementById('stress-count'),
@@ -284,6 +286,11 @@ async function main() {
     // --- Subscriptions ---
     room.subscribePresence((p) => {
         ui.updateConnectionManager(room.peers, room.presence, room.clientId);
+        
+        // Update Test Suite Topology
+        const myP = p[room.clientId] || {};
+        testSuite.updateTopology(myP.role || 'peer', myP.hostId);
+        
         testSuite.onPresenceUpdate();
     });
 

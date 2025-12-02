@@ -3,6 +3,10 @@ export class TestSuite {
         this.room = room;
         this.ui = ui;
 
+        this.role = 'peer';
+        this.hostId = null;
+        this.peerStats = {}; // Tracking incoming traffic as Host
+
         // Latency & Jitter
         this.latencyRunning = false;
         this.latencyInterval = null;
@@ -30,12 +34,50 @@ export class TestSuite {
         this.startBackgroundMonitor();
     }
 
+    updateTopology(role, hostId) {
+        this.role = role;
+        this.hostId = hostId;
+    }
+
     handleMessage(e) {
         const data = e.data;
+        const now = performance.now();
 
-        // Handle Latency Pings
+        // 1. Latency: P2P Ping (Host Side Logic)
+        if (data.type === 'p2p-ping' && data.target === this.room.clientId) {
+            this.room.send({
+                type: 'p2p-pong',
+                target: data.sender,
+                pingTimestamp: data.timestamp,
+                echo: false
+            });
+            // Visual feedback for host
+            this.ui.updateDashboardMetric('p2p-rtt', 'RCV');
+        }
+
+        // 2. Latency: P2P Pong (Peer Side Logic)
+        if (data.type === 'p2p-pong' && data.target === this.room.clientId) {
+            const rtt = now - data.pingTimestamp;
+            this.ui.updateDashboardMetric('p2p-rtt', rtt.toFixed(0));
+            this.ui.logLatency(`P2P RTT (via Host): ${rtt.toFixed(2)}ms`, 'success');
+            // We use this RTT for the chart if we are in P2P mode
+            this.ui.recordChartData(rtt);
+        }
+
+        // 3. Throughput: Load Packet (Host Side Logic)
+        if (data.type === 'throughput-load' && data.target === this.room.clientId) {
+            // Rough estimation of payload size including overhead
+            const approxSize = data.payload ? data.payload.length + 50 : 50;
+            this.trackPeerTraffic(data.sender, approxSize);
+        }
+
+        // 4. Throughput: Stats Report (Peer Side Logic)
+        if (data.type === 'throughput-report' && data.target === this.room.clientId) {
+            this.ui.updateDashboardMetric('host-rx', data.kbps);
+        }
+
+        // Handle Standard Echo Latency Pings (Fallback / Self Test)
         if (data.type === 'test-ping' && data.sender === this.room.clientId) {
-            const now = performance.now();
             const rtt = now - data.timestamp;
             
             // Calculate Jitter (RFC 1889ish simplified)
@@ -44,10 +86,45 @@ export class TestSuite {
             this.jitter += (diff - this.jitter) / 16;
             this.prevRtt = rtt;
 
-            this.ui.logLatency(`RTT: ${rtt.toFixed(2)}ms | Jitter: ${this.jitter.toFixed(2)}ms`);
+            this.ui.logLatency(`Server RTT: ${rtt.toFixed(2)}ms | Jitter: ${this.jitter.toFixed(2)}ms`);
             this.ui.updateDashboardMetric('ping', rtt.toFixed(0));
             this.ui.updateDashboardMetric('jitter', this.jitter.toFixed(1));
-            this.ui.recordChartData(rtt);
+            
+            // Only chart server RTT if not doing P2P
+            if (!this.hostId) this.ui.recordChartData(rtt);
+        }
+    }
+
+    trackPeerTraffic(senderId, bytes) {
+        if (!this.peerStats[senderId]) {
+            this.peerStats[senderId] = { bytes: 0, count: 0, lastReport: Date.now() };
+        }
+        const stats = this.peerStats[senderId];
+        stats.bytes += bytes;
+        stats.count++;
+
+        const now = Date.now();
+        if (now - stats.lastReport > 1000) {
+            // Send report back to peer
+            const elapsed = (now - stats.lastReport) / 1000;
+            const kbps = ((stats.bytes / 1024) / elapsed).toFixed(1);
+            const pps = Math.round(stats.count / elapsed);
+            
+            this.room.send({
+                type: 'throughput-report',
+                target: senderId,
+                kbps,
+                pps,
+                echo: false
+            });
+            
+            // Update local host dashboard to show we are receiving
+            this.ui.updateDashboardMetric('rx', pps); // Show PPS from this peer
+            
+            // Reset
+            stats.bytes = 0;
+            stats.count = 0;
+            stats.lastReport = now;
         }
     }
 
@@ -67,6 +144,8 @@ export class TestSuite {
 
     // Called by app when presence updates arrive
     onPresenceUpdate() {
+        // Removed generic RX count here to focus on test traffic, or keep it for background noise?
+        // Let's keep it for general noise monitoring
         this.rxCount++;
     }
 
@@ -97,12 +176,24 @@ export class TestSuite {
         this.prevRtt = 0;
 
         this.latencyInterval = setInterval(() => {
-            this.room.send({
-                type: 'test-ping',
-                timestamp: performance.now(),
-                sender: this.room.clientId,
-                echo: true // Critical: we want to hear our own echo to measure RTT
-            });
+            if (this.hostId && this.role === 'peer') {
+                // P2P Mode
+                this.room.send({
+                    type: 'p2p-ping',
+                    target: this.hostId,
+                    sender: this.room.clientId,
+                    timestamp: performance.now(),
+                    echo: false 
+                });
+            } else {
+                // Echo Mode
+                this.room.send({
+                    type: 'test-ping',
+                    timestamp: performance.now(),
+                    sender: this.room.clientId,
+                    echo: true 
+                });
+            }
         }, 200);
     }
 
@@ -110,6 +201,7 @@ export class TestSuite {
         this.latencyRunning = false;
         clearInterval(this.latencyInterval);
         this.ui.logLatency("Latency test stopped.", "system");
+        this.ui.updateDashboardMetric('p2p-rtt', '--');
     }
 
     // --- Throughput Test ---
@@ -124,12 +216,26 @@ export class TestSuite {
         this.throughputInterval = setInterval(() => {
             if (!this.throughputRunning) return;
 
-            // Update presence with heavy payload
-            this.room.updatePresence({
-                test_mode: 'throughput',
-                timestamp: Date.now(),
-                payload: filler
-            });
+            // Update presence or Send Event?
+            // Switching to Event for P2P routing control
+            
+            if (this.hostId && this.role === 'peer') {
+                this.room.send({
+                    type: 'throughput-load',
+                    target: this.hostId,
+                    sender: this.room.clientId,
+                    payload: filler,
+                    echo: false
+                });
+            } else {
+                // Fallback / Broadcast Load
+                // We use presence here if no specific host, to stress test everyone
+                this.room.updatePresence({
+                    test_mode: 'throughput',
+                    timestamp: Date.now(),
+                    payload: filler
+                });
+            }
 
             // Update Stats
             this.throughputStats.sent++;
@@ -149,11 +255,12 @@ export class TestSuite {
     stopThroughputTest() {
         this.throughputRunning = false;
         clearInterval(this.throughputInterval);
-        // Clean up presence
+        // Clean up presence just in case we used it
         this.room.updatePresence({ test_mode: null, payload: null });
         this.ui.updateThroughputStats(null);
         this.ui.updateDashboardMetric('pps', 0);
         this.ui.updateDashboardMetric('bw', 0);
+        this.ui.updateDashboardMetric('host-rx', 0);
     }
 
     // --- Stress Test (Room State) ---
