@@ -44,8 +44,20 @@
                         <div class="big-number"><span id="dash-ping">--</span> ms</div>
                     </div>
                     <div class="card">
-                        <h3>TX Rate</h3>
+                        <h3>Jitter (Stability)</h3>
+                        <div class="big-number"><span id="dash-jitter">0</span> ms</div>
+                    </div>
+                    <div class="card">
+                        <h3>State Convergence</h3>
+                        <div class="big-number"><span id="dash-conv">--</span> ms</div>
+                    </div>
+                    <div class="card">
+                        <h3>TX Rate (Sent)</h3>
                         <div class="big-number"><span id="dash-pps">0</span> /s</div>
+                    </div>
+                    <div class="card">
+                        <h3>RX Rate (Received)</h3>
+                        <div class="big-number"><span id="dash-rx">0</span> /s</div>
                     </div>
                     <div class="card">
                         <h3>TX Bandwidth</h3>
@@ -64,7 +76,7 @@
             <!-- Latency Test View -->
             <section id="latency" class="view">
                 <h2>Latency & Jitter</h2>
-                <p>Sends high-frequency ephemeral events to measure round-trip time.</p>
+                <p>Sends high-frequency ephemeral events to measure round-trip time and packet delay variation.</p>
                 <div class="controls">
                     <button id="btn-latency-start" class="action-btn">Start Test</button>
                     <button id="btn-latency-stop" class="action-btn secondary" disabled>Stop</button>
@@ -112,11 +124,12 @@
 
             <!-- Stress View -->
             <section id="stress" class="view">
-                <h2>Room State Stress</h2>
-                <p>Populates the shared Room State with hundreds of objects to test synchronization lag.</p>
+                <h2>Room State Stress & Convergence</h2>
+                <p>Populates the shared Room State with hundreds of objects. Use "Check Convergence" to measure the exact time it takes for a state write to confirm back to this client.</p>
                 <div class="controls">
                     <button id="btn-stress-100" class="action-btn">Add 100 Objects</button>
                     <button id="btn-stress-500" class="action-btn warning">Add 500 Objects</button>
+                    <button id="btn-stress-conv" class="action-btn">Check Convergence</button>
                     <button id="btn-stress-clear" class="action-btn danger">Clear All State</button>
                 </div>
                 <div class="stats-row">

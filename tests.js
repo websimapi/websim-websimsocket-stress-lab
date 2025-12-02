@@ -3,9 +3,11 @@ export class TestSuite {
         this.room = room;
         this.ui = ui;
 
-        // Latency
+        // Latency & Jitter
         this.latencyRunning = false;
         this.latencyInterval = null;
+        this.prevRtt = 0;
+        this.jitter = 0;
 
         // Throughput
         this.throughputRunning = false;
@@ -13,8 +15,19 @@ export class TestSuite {
         this.throughputStats = { sent: 0, bytes: 0, startTime: 0 };
         this.payloadSize = 100;
 
+        // Incoming Metrics
+        this.rxCount = 0;
+        this.lastRxCheck = Date.now();
+        
+        // Convergence
+        this.convergenceStart = 0;
+        this.convergenceKey = null;
+
         // Setup Listeners
         this.room.onmessage = (e) => this.handleMessage(e);
+        
+        // Start background monitor
+        this.startBackgroundMonitor();
     }
 
     handleMessage(e) {
@@ -22,10 +35,54 @@ export class TestSuite {
 
         // Handle Latency Pings
         if (data.type === 'test-ping' && data.sender === this.room.clientId) {
-            const rtt = performance.now() - data.timestamp;
-            this.ui.logLatency(`RTT: ${rtt.toFixed(2)}ms | Size: ${JSON.stringify(data).length} bytes`);
+            const now = performance.now();
+            const rtt = now - data.timestamp;
+            
+            // Calculate Jitter (RFC 1889ish simplified)
+            // J = J + (|RTT - prevRTT| - J) / 16
+            const diff = Math.abs(rtt - this.prevRtt);
+            this.jitter += (diff - this.jitter) / 16;
+            this.prevRtt = rtt;
+
+            this.ui.logLatency(`RTT: ${rtt.toFixed(2)}ms | Jitter: ${this.jitter.toFixed(2)}ms`);
             this.ui.updateDashboardMetric('ping', rtt.toFixed(0));
+            this.ui.updateDashboardMetric('jitter', this.jitter.toFixed(1));
             this.ui.recordChartData(rtt);
+        }
+    }
+
+    startBackgroundMonitor() {
+        // Monitor RX Rate (Incoming updates)
+        setInterval(() => {
+            const now = Date.now();
+            const elapsed = (now - this.lastRxCheck) / 1000;
+            if (elapsed > 0) {
+                const rxRate = Math.round(this.rxCount / elapsed);
+                this.ui.updateDashboardMetric('rx', rxRate);
+                this.rxCount = 0;
+                this.lastRxCheck = now;
+            }
+        }, 1000);
+    }
+
+    // Called by app when presence updates arrive
+    onPresenceUpdate() {
+        this.rxCount++;
+    }
+
+    // Called by app when room state updates arrive
+    onRoomStateUpdate(state) {
+        // Check for convergence test key
+        if (this.convergenceKey && state[this.convergenceKey]) {
+            const end = performance.now();
+            const duration = end - this.convergenceStart;
+            
+            this.ui.updateDashboardMetric('conv', duration.toFixed(0));
+            this.ui.logLatency(`Convergence Confirmation: ${duration.toFixed(2)}ms`, 'success');
+            
+            // Cleanup
+            this.room.updateRoomState({ [this.convergenceKey]: null });
+            this.convergenceKey = null;
         }
     }
 
@@ -34,6 +91,10 @@ export class TestSuite {
         if (this.latencyRunning) return;
         this.latencyRunning = true;
         this.ui.logLatency("Starting latency test (5 pings/sec)...", "system");
+        
+        // Reset jitter
+        this.jitter = 0;
+        this.prevRtt = 0;
 
         this.latencyInterval = setInterval(() => {
             this.room.send({
@@ -96,6 +157,21 @@ export class TestSuite {
     }
 
     // --- Stress Test (Room State) ---
+    async runConvergenceTest() {
+        if (this.convergenceKey) return; // Already running
+        
+        const key = `conv_test_${this.room.clientId}_${Date.now()}`;
+        this.convergenceKey = key;
+        this.convergenceStart = performance.now();
+        
+        this.ui.logLatency("Starting convergence test...", "system");
+        
+        // Trigger update
+        this.room.updateRoomState({
+            [key]: { timestamp: Date.now() }
+        });
+    }
+
     async addStressObjects(count) {
         const batch = {};
         const prefix = `stress_${this.room.clientId}_${Date.now()}_`;

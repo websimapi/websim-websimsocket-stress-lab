@@ -15,7 +15,10 @@ const ui = {
         statusText: document.getElementById('connection-text'),
         peerCount: document.getElementById('active-peers'),
         ping: document.getElementById('dash-ping'),
+        jitter: document.getElementById('dash-jitter'),
+        conv: document.getElementById('dash-conv'),
         pps: document.getElementById('dash-pps'),
+        rx: document.getElementById('dash-rx'),
         keys: document.getElementById('dash-keys'),
         bw: document.getElementById('dash-bw'),
         stressCount: document.getElementById('stress-count'),
@@ -161,10 +164,12 @@ async function main() {
     // --- Subscriptions ---
     room.subscribePresence((p) => {
         ui.updatePeers(room.peers);
+        testSuite.onPresenceUpdate();
     });
 
     room.subscribeRoomState((s) => {
         ui.updateRoomStats(s);
+        testSuite.onRoomStateUpdate(s);
     });
 
     // --- Event Listeners for Controls ---
@@ -206,6 +211,7 @@ async function main() {
     // Stress
     document.getElementById('btn-stress-100').onclick = () => testSuite.addStressObjects(100);
     document.getElementById('btn-stress-500').onclick = () => testSuite.addStressObjects(500);
+    document.getElementById('btn-stress-conv').onclick = () => testSuite.runConvergenceTest();
     document.getElementById('btn-stress-clear').onclick = () => testSuite.clearStressObjects();
 }
 

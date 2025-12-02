@@ -33,5 +33,33 @@ export const systemInfoHTML = `
         <strong>Open this URL in 10-20 separate tabs</strong>. 
         Use the "Throughput" tool in each tab to simulate load, then watch the "Latency" tab in your main window to see how RTT degrades as node count increases.
     </p>
+
+    <h3>5. Analyzing Results</h3>
+    <div class="analysis-grid">
+        <div class="analysis-item">
+            <h4>Jitter (Stability)</h4>
+            <p>
+                <strong>Ideal:</strong> &lt; 10ms<br>
+                <strong>Poor:</strong> &gt; 50ms<br>
+                High jitter means the WebSocket event loop is blocked. If this spikes during the "Stress" or "Throughput" tests, the browser's main thread is struggling to serialize/deserialize the JSON volume.
+            </p>
+        </div>
+        <div class="analysis-item">
+            <h4>State Convergence</h4>
+            <p>
+                <strong>Ideal:</strong> ~= RTT (Round Trip Time)<br>
+                <strong>Poor:</strong> &gt; 2x RTT<br>
+                This measures the time it takes for a Room State change (e.g., picking up an item) to travel to the server and back to you. If this is high, players will see "ghost items" that they can't pick up because the server hasn't confirmed the removal yet.
+            </p>
+        </div>
+        <div class="analysis-item">
+            <h4>RX Rate (Incoming Updates)</h4>
+            <p>
+                This metric shows how many Presence updates your client is processing per second from <em>other</em> peers.
+                <br><strong>Formula:</strong> <code>N_Peers * N_Updates_Per_Sec</code>.
+                <br>If you have 10 peers sending 10 updates/s, you should see ~100 RX/s. If this number drops while peers are constant, the network is dropping packets or the client is throttled.
+            </p>
+        </div>
+    </div>
 `;
 

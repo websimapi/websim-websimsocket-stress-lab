@@ -154,6 +154,25 @@ input[type=range] { width: 100%; max-width: 300px; }
 .log-entry { margin-bottom: 4px; border-bottom: 1px solid #222; padding-bottom: 2px; }
 .log-entry.error { color: var(--danger); }
 .log-entry.success { color: #22c55e; }
+.log-entry.system { color: var(--warning); font-style: italic; }
+
+/* Analysis Grid */
+.analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.analysis-item {
+    background: rgba(255,255,255,0.05);
+    padding: 1rem;
+    border-radius: 6px;
+    border-left: 3px solid var(--primary);
+}
+
+.analysis-item h4 { margin: 0 0 0.5rem 0; color: var(--text); }
+.analysis-item p { margin: 0; font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; }
 
 /* Stress Test Visuals */
 #stress-visualizer {
