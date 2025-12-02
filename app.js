@@ -26,12 +26,23 @@ const ui = {
         stressVis: document.getElementById('stress-visualizer'),
         log: document.getElementById('latency-log'),
         
+        // Connection Manager
+        hostCount: document.getElementById('host-count'),
+        peerCount: document.getElementById('peer-count'),
+        hostsList: document.getElementById('hosts-list'),
+        peersList: document.getElementById('peers-list'),
+        roleToggle: document.getElementById('role-toggle'),
+        currentRole: document.getElementById('current-role'),
+
         // Throughput Elements
         tpStats: document.getElementById('throughput-stats'),
         tpRate: document.getElementById('tp-rate'),
         tpBandwidth: document.getElementById('tp-bandwidth'),
         tpTotal: document.getElementById('tp-total')
     },
+
+    // Throttle for connection list updates to prevent DOM thrashing
+    lastConnUpdate: 0,
 
     init() {
         // Tab Switching
@@ -73,6 +84,16 @@ const ui = {
                 animation: false
             }
         });
+
+        // Connection Manager Controls
+        this.els.roleToggle.addEventListener('change', (e) => {
+            const newRole = e.target.checked ? 'host' : 'peer';
+            // Reset hostId if we become a host, otherwise keep it (or null it? let's null it to be clean)
+            const update = { role: newRole };
+            if (newRole === 'host') update.hostId = null;
+            
+            room.updatePresence(update);
+        });
     },
 
     updateConnection(isConnected) {
@@ -87,9 +108,105 @@ const ui = {
         }
     },
 
-    updatePeers(peers) {
-        const count = Object.keys(peers).length;
-        this.els.peerCount.textContent = count;
+    updateConnectionManager(peers, presence, myId) {
+        // Throttle updates to ~2fps to save CPU during stress tests
+        const now = Date.now();
+        if (now - this.lastConnUpdate < 500) return;
+        this.lastConnUpdate = now;
+
+        const myPresence = presence[myId] || {};
+        const myRole = myPresence.role || 'peer';
+        const myHostId = myPresence.hostId;
+
+        // Sync local controls
+        this.els.roleToggle.checked = (myRole === 'host');
+        this.els.currentRole.textContent = myRole;
+        this.els.currentRole.className = myRole;
+
+        // Sort peers
+        const hosts = [];
+        const ordinaryPeers = [];
+
+        Object.entries(peers).forEach(([id, peerInfo]) => {
+            const p = presence[id] || {};
+            // Default to peer if undefined
+            const r = p.role || 'peer';
+            
+            const entry = { id, ...peerInfo, hostId: p.hostId };
+            if (r === 'host') hosts.push(entry);
+            else ordinaryPeers.push(entry);
+        });
+
+        this.els.hostCount.textContent = hosts.length;
+        this.els.peerCount.textContent = ordinaryPeers.length;
+
+        // Render Hosts
+        if (hosts.length === 0) {
+            this.els.hostsList.innerHTML = '<div class="empty-msg">No active hosts</div>';
+        } else {
+            this.els.hostsList.innerHTML = '';
+            hosts.forEach(h => {
+                const el = document.createElement('div');
+                el.className = 'list-item';
+                
+                let action = '';
+                if (h.id === myId) {
+                    action = `<span class="badge me">You</span>`;
+                } else if (myRole === 'peer') {
+                    if (myHostId === h.id) {
+                        action = `<button class="btn-xs success" disabled>Connected</button>`;
+                    } else {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn-xs primary';
+                        btn.textContent = 'Connect';
+                        btn.onclick = () => room.updatePresence({ hostId: h.id });
+                        action = btn; // append element later
+                    }
+                }
+
+                el.innerHTML = `
+                    <div class="user-info">
+                        <img src="${h.avatarUrl}" class="avatar-xs">
+                        <span class="username">${h.username}</span>
+                    </div>
+                `;
+                
+                if (typeof action === 'string') el.innerHTML += action;
+                else el.appendChild(action);
+
+                this.els.hostsList.appendChild(el);
+            });
+        }
+
+        // Render Peers
+        if (ordinaryPeers.length === 0) {
+            this.els.peersList.innerHTML = '<div class="empty-msg">No other peers</div>';
+        } else {
+            this.els.peersList.innerHTML = '';
+            ordinaryPeers.forEach(p => {
+                const el = document.createElement('div');
+                el.className = 'list-item';
+                
+                let status = '';
+                if (p.id === myId) status += `<span class="badge me">You</span> `;
+                
+                if (p.hostId) {
+                    const hostName = peers[p.hostId]?.username || 'Unknown';
+                    status += `<span class="status-text">→ ${hostName}</span>`;
+                } else {
+                    status += `<span class="status-text muted">Idle</span>`;
+                }
+
+                el.innerHTML = `
+                    <div class="user-info">
+                        <img src="${p.avatarUrl}" class="avatar-xs">
+                        <span class="username">${p.username}</span>
+                    </div>
+                    <div>${status}</div>
+                `;
+                this.els.peersList.appendChild(el);
+            });
+        }
     },
 
     updateRoomStats(state) {
@@ -157,13 +274,14 @@ async function main() {
     // Connect
     await room.initialize();
     ui.updateConnection(true);
-    ui.updatePeers(room.peers);
+    ui.updateConnectionManager(room.peers, room.presence, room.clientId);
 
     const testSuite = new TestSuite(room, ui);
 
     // --- Subscriptions ---
     room.subscribePresence((p) => {
         ui.updatePeers(room.peers);
+        ui.updateConnectionManager(room.peers, room.presence, room.clientId);
         testSuite.onPresenceUpdate();
     });
 

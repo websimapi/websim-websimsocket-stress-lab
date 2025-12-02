@@ -38,6 +38,36 @@
 
             <!-- Dashboard View -->
             <section id="dashboard" class="view active">
+                <div class="connection-panel">
+                    <div class="panel-header">
+                        <h3>Connection Manager</h3>
+                        <div class="role-control">
+                            <span>Role: <strong id="current-role">Peer</strong></span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="role-toggle">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="lists-container">
+                        <div class="list-column">
+                            <div class="list-header">
+                                <h4>Available Hosts</h4>
+                                <span class="badge-count" id="host-count">0</span>
+                            </div>
+                            <div id="hosts-list" class="scroll-list"></div>
+                        </div>
+                        <div class="list-column">
+                            <div class="list-header">
+                                <h4>Peers</h4>
+                                <span class="badge-count" id="peer-count">0</span>
+                            </div>
+                            <div id="peers-list" class="scroll-list"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card-grid">
                     <div class="card">
                         <h3>Round Trip Time (RTT)</h3>
