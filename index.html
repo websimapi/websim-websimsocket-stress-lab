@@ -93,6 +93,21 @@
                     <button id="btn-thru-start" class="action-btn">Start Load</button>
                     <button id="btn-thru-stop" class="action-btn secondary" disabled>Stop</button>
                 </div>
+
+                <div id="throughput-stats" class="stats-panel hidden">
+                    <div class="stat-item">
+                        <div class="stat-label">TX Rate</div>
+                        <div class="stat-value" id="tp-rate">0 pps</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Bandwidth</div>
+                        <div class="stat-value" id="tp-bandwidth">0 KB/s</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Total Sent</div>
+                        <div class="stat-value" id="tp-total">0 MB</div>
+                    </div>
+                </div>
             </section>
 
             <!-- Stress View -->

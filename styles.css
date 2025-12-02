@@ -173,6 +173,28 @@ input[type=range] { width: 100%; max-width: 300px; }
 
 .stress-node.active { background: var(--primary); }
 
+/* Throughput Stats */
+.stats-panel {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    background: rgba(0,0,0,0.3);
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-top: 1.5rem;
+    border: 1px solid var(--border);
+    transition: opacity 0.3s;
+}
+
+.stats-panel.hidden {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.stat-item { text-align: center; }
+.stat-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.stat-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); font-family: monospace; }
+
 /* System Info Typography */
 #info-content h3 { color: var(--primary); margin-top: 2rem; }
 #info-content ul { line-height: 1.6; color: var(--text-muted); }

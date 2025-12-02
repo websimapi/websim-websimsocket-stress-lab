@@ -21,7 +21,13 @@ const ui = {
         stressCount: document.getElementById('stress-count'),
         stressSize: document.getElementById('stress-size'),
         stressVis: document.getElementById('stress-visualizer'),
-        log: document.getElementById('latency-log')
+        log: document.getElementById('latency-log'),
+        
+        // Throughput Elements
+        tpStats: document.getElementById('throughput-stats'),
+        tpRate: document.getElementById('tp-rate'),
+        tpBandwidth: document.getElementById('tp-bandwidth'),
+        tpTotal: document.getElementById('tp-total')
     },
 
     init() {
@@ -127,6 +133,17 @@ const ui = {
         data.push(ping);
         data.shift();
         this.chart.update();
+    },
+
+    updateThroughputStats(stats) {
+        if (!stats) {
+            this.els.tpStats.classList.add('hidden');
+            return;
+        }
+        this.els.tpStats.classList.remove('hidden');
+        this.els.tpRate.textContent = `${stats.pps} pps`;
+        this.els.tpBandwidth.textContent = `${stats.kbps} KB/s`;
+        this.els.tpTotal.textContent = `${stats.totalMb} MB`;
     }
 };
 

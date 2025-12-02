@@ -10,6 +10,7 @@ export class TestSuite {
         // Throughput
         this.throughputRunning = false;
         this.throughputInterval = null;
+        this.throughputStats = { sent: 0, bytes: 0, startTime: 0 };
         this.payloadSize = 100;
 
         // Setup Listeners
@@ -54,6 +55,7 @@ export class TestSuite {
     startThroughputTest(sizeBytes, intervalMs) {
         if (this.throughputRunning) return;
         this.throughputRunning = true;
+        this.throughputStats = { sent: 0, bytes: 0, startTime: Date.now() };
 
         // Create junk payload
         const filler = "X".repeat(Math.max(0, sizeBytes - 50)); // -50 for overhead
@@ -68,6 +70,16 @@ export class TestSuite {
                 payload: filler
             });
 
+            // Update Stats
+            this.throughputStats.sent++;
+            this.throughputStats.bytes += sizeBytes;
+
+            const elapsedSec = (Date.now() - this.throughputStats.startTime) / 1000;
+            const pps = Math.round(this.throughputStats.sent / elapsedSec);
+            const kbps = ((this.throughputStats.bytes / 1024) / elapsedSec).toFixed(1);
+            const totalMb = (this.throughputStats.bytes / 1024 / 1024).toFixed(2);
+
+            this.ui.updateThroughputStats({ pps, kbps, totalMb });
             this.ui.updateDashboardMetric('size', sizeBytes);
         }, intervalMs);
     }
@@ -77,6 +89,12 @@ export class TestSuite {
         clearInterval(this.throughputInterval);
         // Clean up presence
         this.room.updatePresence({ test_mode: null, payload: null });
+        this.ui.updateThroughputStats(null); // Hide stats or keep them? Let's keep last known state actually, but maybe dim it.
+        // For now, let's just leave the last values visible but maybe indicate stopped.
+        // Actually, the app.js logic hides it if null. Let's not pass null if we want to see final results. 
+        // But for cleaner UX indicating "active", let's pass null to fade it out as per my app.js logic (hidden class).
+        // Wait, looking at styles, .hidden sets opacity 0.3. That's perfect for "stopped".
+        this.ui.updateThroughputStats(null); 
     }
 
     // --- Stress Test (Room State) ---
