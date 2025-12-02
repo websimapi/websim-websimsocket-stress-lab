@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WebsimSocket Stress Lab</title>
+    <link rel="stylesheet" href="styles.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "chart.js/auto": "https://esm.sh/chart.js/auto"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="logo">Socket<span>Lab</span></div>
+            <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
+            <button class="nav-btn" data-tab="latency">Latency Test</button>
+            <button class="nav-btn" data-tab="throughput">Throughput</button>
+            <button class="nav-btn" data-tab="stress">State Stress</button>
+            <button class="nav-btn" data-tab="info">System Info</button>
+        </nav>
+
+        <main class="content">
+            <!-- Header -->
+            <header>
+                <div class="status-indicator">
+                    <span id="connection-status" class="dot disconnected"></span>
+                    <span id="connection-text">Connecting...</span>
+                </div>
+                <div class="peer-count">
+                    Active Peers: <span id="active-peers">0</span>
+                </div>
+            </header>
+
+            <!-- Dashboard View -->
+            <section id="dashboard" class="view active">
+                <div class="card-grid">
+                    <div class="card">
+                        <h3>Round Trip Time (RTT)</h3>
+                        <div class="big-number"><span id="dash-ping">--</span> ms</div>
+                    </div>
+                    <div class="card">
+                        <h3>Inbound Events</h3>
+                        <div class="big-number"><span id="dash-eps">0</span> /s</div>
+                    </div>
+                    <div class="card">
+                        <h3>Room State Keys</h3>
+                        <div class="big-number"><span id="dash-keys">0</span></div>
+                    </div>
+                    <div class="card">
+                        <h3>Packet Size</h3>
+                        <div class="big-number"><span id="dash-size">0</span> B</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="liveChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Latency Test View -->
+            <section id="latency" class="view">
+                <h2>Latency & Jitter</h2>
+                <p>Sends high-frequency ephemeral events to measure round-trip time.</p>
+                <div class="controls">
+                    <button id="btn-latency-start" class="action-btn">Start Test</button>
+                    <button id="btn-latency-stop" class="action-btn secondary" disabled>Stop</button>
+                </div>
+                <div class="console-output" id="latency-log"></div>
+            </section>
+
+            <!-- Throughput View -->
+            <section id="throughput" class="view">
+                <h2>Presence Throughput</h2>
+                <p>Rapidly updates your 'Presence' payload with increasing data sizes to find bandwidth limits.</p>
+                
+                <div class="control-group">
+                    <label>Payload Size (Bytes)</label>
+                    <input type="range" id="payload-slider" min="100" max="5000" step="100" value="100">
+                    <span id="payload-val">100 B</span>
+                </div>
+
+                <div class="control-group">
+                    <label>Update Frequency (ms)</label>
+                    <input type="range" id="freq-slider" min="16" max="1000" step="16" value="100">
+                    <span id="freq-val">100 ms</span>
+                </div>
+
+                <div class="controls">
+                    <button id="btn-thru-start" class="action-btn">Start Load</button>
+                    <button id="btn-thru-stop" class="action-btn secondary" disabled>Stop</button>
+                </div>
+            </section>
+
+            <!-- Stress View -->
+            <section id="stress" class="view">
+                <h2>Room State Stress</h2>
+                <p>Populates the shared Room State with hundreds of objects to test synchronization lag.</p>
+                <div class="controls">
+                    <button id="btn-stress-100" class="action-btn">Add 100 Objects</button>
+                    <button id="btn-stress-500" class="action-btn warning">Add 500 Objects</button>
+                    <button id="btn-stress-clear" class="action-btn danger">Clear All State</button>
+                </div>
+                <div class="stats-row">
+                    <div>Current Objects: <span id="stress-count">0</span></div>
+                    <div>State Size approx: <span id="stress-size">0</span> KB</div>
+                </div>
+                <div id="stress-visualizer"></div>
+            </section>
+
+            <!-- Info View -->
+            <section id="info" class="view">
+                <div id="info-content"></div>
+            </section>
+        </main>
+    </div>
+    <script type="module" src="app.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
