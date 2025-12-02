@@ -80,7 +80,8 @@ export class TestSuite {
             const totalMb = (this.throughputStats.bytes / 1024 / 1024).toFixed(2);
 
             this.ui.updateThroughputStats({ pps, kbps, totalMb });
-            this.ui.updateDashboardMetric('size', sizeBytes);
+            this.ui.updateDashboardMetric('pps', pps);
+            this.ui.updateDashboardMetric('bw', kbps);
         }, intervalMs);
     }
 
@@ -89,12 +90,9 @@ export class TestSuite {
         clearInterval(this.throughputInterval);
         // Clean up presence
         this.room.updatePresence({ test_mode: null, payload: null });
-        this.ui.updateThroughputStats(null); // Hide stats or keep them? Let's keep last known state actually, but maybe dim it.
-        // For now, let's just leave the last values visible but maybe indicate stopped.
-        // Actually, the app.js logic hides it if null. Let's not pass null if we want to see final results. 
-        // But for cleaner UX indicating "active", let's pass null to fade it out as per my app.js logic (hidden class).
-        // Wait, looking at styles, .hidden sets opacity 0.3. That's perfect for "stopped".
-        this.ui.updateThroughputStats(null); 
+        this.ui.updateThroughputStats(null);
+        this.ui.updateDashboardMetric('pps', 0);
+        this.ui.updateDashboardMetric('bw', 0);
     }
 
     // --- Stress Test (Room State) ---
